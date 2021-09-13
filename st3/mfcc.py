@@ -18,8 +18,8 @@ class MFCC(nn.Module):
                            n_mels=Coqui.n_input, # TODO: recheck: tf uses 40?
                            win_length=Coqui.audio_window_samples,
                            hop_length=Coqui.audio_step_samples,
-                           f_min=20,
-                           f_max=Coqui.sample_rate // 2,
+                           f_min=20.,
+                           f_max=Coqui.sample_rate / 2.,
                            # https://github.com/tensorflow/tensorflow/blob/8d72537c6abf5a44103b57b9c2e22c14f5f49698/tensorflow/core/kernels/spectrogram.cc#L29
                            window_fn=torch.hann_window,
                            pad=0,
