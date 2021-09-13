@@ -11,6 +11,7 @@ setup(
     install_requires=[
         #"lhotse",
         #"tensorflow-macos",
+        "tensorflow",
         "torch",
         "torchaudio",
     ]
