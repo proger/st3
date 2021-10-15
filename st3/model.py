@@ -39,7 +39,12 @@ class DeepSpeech(nn.Module):
 
 
 if __name__ == '__main__':
+    import argparse
     import st3.init.coqui
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('output_checkpoint')
+    args = parser.parse_args()
 
     model = DeepSpeech()
     model.load_state_dict(st3.init.coqui.state_dict())
@@ -68,3 +73,4 @@ if __name__ == '__main__':
         print(torch.nn.functional.normalize(x) @ torch.nn.functional.normalize(torch.tensor(tf_logits[0])).T)
         assert torch.allclose(x, torch.tensor(tf_logits[0]), atol=1e-6)
 
+    torch.save(model, args.output_checkpoint)
