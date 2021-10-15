@@ -64,7 +64,7 @@ class Decoder(nn.Module):
         self.frontend = st3.mfcc.MFCC()
         model = DeepSpeech()
         self.hidden_size = model.lstm.hidden_size
-        self.model = torch.jit.trace(model, (torch.randn(1, 19*26), (torch.randn(1, self.hidden_size), torch.randn(1, self.hidden_size))))
+        self.model = torch.jit.trace(model, (torch.randn(1, 1, 19*26), (torch.randn(1, self.hidden_size), torch.randn(1, self.hidden_size))))
 
         self.beam_size = 10
         self.alphabet = " abcdefghijklmnopqrstuvwxyz'ε"
@@ -75,14 +75,10 @@ class Decoder(nn.Module):
     def forward(self, waveform):
         state = (torch.zeros(1, self.hidden_size), torch.zeros(1, self.hidden_size))
         frames = self.frontend(waveform).unsqueeze(0)
-        windows = self.unfold(frames.unsqueeze(0)).permute(2,0,1)
+        windows = self.unfold(frames.unsqueeze(0)).permute(0,2,1) # (N,T,C)
 
-        outputs = []
-        for window in windows:
-            out, state = self.model(window.reshape(1,-1), state)
-            outputs.append(out)
-
-        return beams(torch.stack(outputs).squeeze(), self.beam_size, self.alphabet, self.blank_index)
+        outputs, _ = self.model(windows, state)
+        return beams(outputs.squeeze(), self.beam_size, self.alphabet, self.blank_index)
 
 
 decoder = torch.jit.script(Decoder())

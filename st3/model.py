@@ -17,7 +17,7 @@ class DeepSpeech(nn.Module):
         self.relu_2 = ClippedReLU()
         self.layer_3 = nn.Linear(2048, 2048)
         self.relu_3 = ClippedReLU()
-        self.lstm = nn.LSTMCell(2048, 2048)
+        self.lstm = nn.LSTM(2048, 2048, batch_first=True)
         self.layer_5 = nn.Linear(2048, 2048)
         self.relu_5 = ClippedReLU()
         self.layer_6 = nn.Linear(2048, 29)
@@ -30,12 +30,12 @@ class DeepSpeech(nn.Module):
         x = self.relu_2(x)
         x = self.layer_3(x)
         x = self.relu_3(x)
-        new_state_h, new_state_c = self.lstm(x, (previous_state_h, previous_state_c))
-        x = self.layer_5(new_state_h)
+        x, (new_state_h, new_state_c) = self.lstm(x, (previous_state_h.unsqueeze(0), previous_state_c.unsqueeze(0)))
+        x = self.layer_5(x)
         x = self.relu_5(x)
         x = self.layer_6(x)
-        x = x.log_softmax(dim=1)
-        return x, (new_state_h, new_state_c)
+        x = x.log_softmax(dim=-1)
+        return x, (new_state_h.squeeze(0), new_state_c.squeeze(0))
 
 
 if __name__ == '__main__':
@@ -63,14 +63,14 @@ if __name__ == '__main__':
                        sess.graph.get_tensor_by_name('previous_state_c:0'): np.zeros((1,2048))})
 
     with torch.no_grad():
-        x, (new_state_h, new_state_c) = model(torch.ones(1, 494), (torch.zeros(1,2048), torch.zeros(1,2048)))
+        x, (new_state_h, new_state_c) = model(torch.ones(1, 1, 494), (torch.zeros(1,2048), torch.zeros(1,2048)))
         print(torch.nn.functional.normalize(new_state_c) @ torch.nn.functional.normalize(torch.tensor(tf_new_state_c)).T)
         assert torch.allclose(new_state_c[0], torch.tensor(tf_new_state_c[0]), atol=1e-3)
 
         assert torch.allclose(new_state_h[0], torch.tensor(tf_new_state_h[0]), atol=1e-3)
 
-        x = x.exp()
-        print(torch.nn.functional.normalize(x) @ torch.nn.functional.normalize(torch.tensor(tf_logits[0])).T)
+        x = x[0].exp()
+        print(torch.nn.functional.normalize(x, dim=0) @ torch.nn.functional.normalize(torch.tensor(tf_logits[0])).T)
         assert torch.allclose(x, torch.tensor(tf_logits[0]), atol=1e-6)
 
     torch.save(model, args.output_checkpoint)

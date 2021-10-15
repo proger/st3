@@ -54,10 +54,10 @@ def from_lstm_block_cell(nodes, name='cudnn_lstm/rnn/multi_rnn_cell/cell_0/cudnn
     i,g,f,o = bias.chunk(4)
     bias = torch.cat([i,f,g,o])
 
-    return {f'{output_name}.weight_ih': weight_ih,
-            f'{output_name}.weight_hh': weight_hh,
-            f'{output_name}.bias_ih': torch.zeros_like(bias),
-            f'{output_name}.bias_hh': bias}
+    return {f'{output_name}.weight_ih_l0': weight_ih,
+            f'{output_name}.weight_hh_l0': weight_hh,
+            f'{output_name}.bias_ih_l0': torch.zeros_like(bias),
+            f'{output_name}.bias_hh_l0': bias}
 
 
 def state_dict(path_to_pb=Coqui.stt_pb):
