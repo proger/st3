@@ -32,7 +32,13 @@ class BLSTMP(nn.Module):
         self.conv1 = nn.Conv1d(in_channels=26, out_channels=13, kernel_size=5, stride=6)
         self.lstm = nn.LSTM(input_size=13, hidden_size=512, num_layers=1, batch_first=True, bidirectional=True, proj_size=3)
 
-    def forward(self, x):
+    def forward(self, x, augment=True):
+        spec = frontend(x.to(device))
+        if augment:
+            spec = time_mask(freq_mask(time_mask(freq_mask(spec.permute(2,1,0))))).permute(2,1,0)
+        #windows = unfold(spec.permute(2,0,1).unsqueeze(1)).permute(0,2,1)
+
+        x = spec.permute(2,0,1).detach()
         x = x.permute(0,2,1)
         x = self.conv1(x)
         x = x.permute(0,2,1)
@@ -42,6 +48,10 @@ class BLSTMP(nn.Module):
 
 model = BLSTMP()
 model = model.to(device)
+
+logger.debug('model {}', sum(p.numel() for p in model.parameters()))
+
+writer.add_hparams({'parameters': sum(p.numel() for p in model.parameters())}, {})
 
 if args.init:
     model.load_state_dict(torch.load(args.init)['model'])
@@ -96,7 +106,7 @@ test_data = torch.utils.data.DataLoader([dataset[i] for i in range(50,60)], batc
 #print(next(iter(data)))
 
 model = model.to(device)
-optimizer = bnb.optim.Adam8bit(model.parameters(), lr=0.0005, betas=(0.9, 0.999), weight_decay=1e-2)
+optimizer = bnb.optim.Adam8bit(model.parameters(), lr=0.0003, betas=(0.9, 0.999), weight_decay=1e-2)
 #optimizer = torch.optim.Adam(model.parameters(), lr=0.001, betas=(0.9, 0.995))
 
 
@@ -165,13 +175,7 @@ def evaluate(test_data):
     total_cer = 0.
     for source, targets, source_lengths, target_lengths in test_data:
         with torch.cuda.amp.autocast(scaler is not None):
-            spec = frontend(source.to(device)).permute(2,0,1)
-            windows = spec.detach()
-
-            #windows = unfold(spec.unsqueeze(1)).permute(0,2,1)
-            #windows = windows.detach()
-
-            output = model(windows)
+            output = model(source)
 
             print(output.logsumexp(dim=0).logsumexp(dim=0))
 
@@ -196,23 +200,7 @@ for _ in range(args.epochs):
 
         with torch.cuda.amp.autocast(scaler is not None):
             # source is (N,S)
-
-            spec = frontend(source.to(device))
-            spec = time_mask(freq_mask(time_mask(freq_mask(spec.permute(2,1,0))))).permute(2,1,0)
-            #windows = unfold(spec.permute(2,0,1).unsqueeze(1)).permute(0,2,1)
-
-            #windows = nn.functional.conv1d(windows.permute(0,2,1), torch.ones(494,494,1,dtype=torch.half,device=device), stride=4).permute(0,2,1)
-            #windows = windows.detach()
-
-            windows = spec.permute(2,0,1).detach()
-
-            # with profile(activities=[ProfilerActivity.CUDA, ProfilerActivity.CPU],
-            #         profile_memory=True, record_shapes=True) as prof:
-            #     output = model(windows)
-
-            # print(prof.key_averages().table(sort_by="self_cpu_memory_usage", row_limit=10))
-
-            output = model(windows)
+            output = model(source)
 
             targets = targets.to(device)
             output_lengths = torch.div(source_lengths, Coqui.audio_step_samples, rounding_mode='floor')-1
@@ -252,7 +240,7 @@ for _ in range(args.epochs):
 
         #scheduler.step()
         step = next(steps)
-        logger.info('step={} loss={} lr={} windows={}', step, loss.item(), [p['lr'] for p in optimizer.param_groups], windows.shape)
+        logger.info('step={} loss={} lr={}', step, loss.item(), [p['lr'] for p in optimizer.param_groups])
         writer.add_scalar('loss', loss.item(), global_step=step)
         #writer.add_scalar('loss/ce', ce.item(), global_step=step)
         writer.add_scalar('loss/ctc', ctc_loss.item(), global_step=step)
