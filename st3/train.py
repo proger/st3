@@ -13,7 +13,7 @@ import torchaudio
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--init', type=Path, required=False, help='initial checkpoint file, get using python -m st3.model init.pth')
-parser.add_argument('--epochs', default=1000, help='how many epochs to repeat')
+parser.add_argument('--epochs', default=60, help='how many epochs to repeat')
 parser.add_argument('--comment', type=str, default='', required=False)
 parser.add_argument('output', type=Path)
 args = parser.parse_args()
@@ -29,17 +29,12 @@ class BLSTMP(nn.Module):
     def __init__(self):
         super().__init__()
 
-        self.conv1 = nn.Conv1d(in_channels=26, out_channels=13, kernel_size=3, stride=3)
-        self.conv2 = nn.Conv1d(in_channels=13, out_channels=6, kernel_size=3, stride=3)
-        self.conv3 = nn.Conv1d(in_channels=6, out_channels=13, kernel_size=3, stride=1)
-
+        self.conv1 = nn.Conv1d(in_channels=26, out_channels=13, kernel_size=5, stride=6)
         self.lstm = nn.LSTM(input_size=13, hidden_size=512, num_layers=1, batch_first=True, bidirectional=True, proj_size=3)
 
     def forward(self, x):
         x = x.permute(0,2,1)
         x = self.conv1(x)
-        x = self.conv2(x)
-        x = self.conv3(x)
         x = x.permute(0,2,1)
         x, _ = self.lstm(x)
         x = x[:,:,:3] + x[:,:,3:]
@@ -103,6 +98,7 @@ test_data = torch.utils.data.DataLoader([dataset[i] for i in range(50,60)], batc
 model = model.to(device)
 #optimizer = bnb.optim.Adam8bit(model.parameters(), lr=0.00005, betas=(0.9, 0.995), weight_decay=1e-5)
 #optimizer = torch.optim.Adam(model.parameters(), lr=0.001, betas=(0.9, 0.995))
+
 
 optimizer = torch.optim.AdamW(model.parameters(), lr=0.0001, weight_decay=1e-2)
 #optimizer = torch.optim.RMSprop(model.parameters(), lr=0.00001)# , weight_decay=1e-2)
@@ -181,9 +177,7 @@ def evaluate(test_data):
 
             output_lengths = torch.div(source_lengths, Coqui.audio_step_samples, rounding_mode='floor')-1
             # subsampling
-            output_lengths = torch.div(output_lengths - 3, 3, rounding_mode='floor')+1
-            output_lengths = torch.div(output_lengths - 3, 3, rounding_mode='floor')+1
-            output_lengths = torch.div(output_lengths - 3, 1, rounding_mode='floor')+1
+            output_lengths = torch.div(output_lengths - 5, 6, rounding_mode='floor')+1
 
             loss += ctc(output.permute(1,0,2), targets.to(device),
                         output_lengths, target_lengths).item()
@@ -224,9 +218,7 @@ for _ in range(args.epochs):
             output_lengths = torch.div(source_lengths, Coqui.audio_step_samples, rounding_mode='floor')-1
 
             # subsampling
-            output_lengths = torch.div(output_lengths - 3, 3, rounding_mode='floor')+1
-            output_lengths = torch.div(output_lengths - 3, 3, rounding_mode='floor')+1
-            output_lengths = torch.div(output_lengths - 3, 1, rounding_mode='floor')+1
+            output_lengths = torch.div(output_lengths - 5, 6, rounding_mode='floor')+1
             #print(output_lengths)
 
             ctc_loss = ctc(output.permute(1,0,2), targets,
