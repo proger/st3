@@ -96,7 +96,7 @@ test_data = torch.utils.data.DataLoader([dataset[i] for i in range(50,60)], batc
 #print(next(iter(data)))
 
 model = model.to(device)
-optimizer = bnb.optim.Adam8bit(model.parameters(), lr=0.001, betas=(0.9, 0.999), weight_decay=1e-2)
+optimizer = bnb.optim.Adam8bit(model.parameters(), lr=0.0005, betas=(0.9, 0.999), weight_decay=1e-2)
 #optimizer = torch.optim.Adam(model.parameters(), lr=0.001, betas=(0.9, 0.995))
 
 
