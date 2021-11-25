@@ -5,7 +5,7 @@ import torch.nn as nn
 
 class ClippedReLU(nn.Module):
     def forward(self, x):
-        return torch.min(20*torch.ones_like(x), x.relu())
+        return torch.nn.functional.threshold(x, 0, 20)
 
 
 class DeepSpeech(nn.Module):
