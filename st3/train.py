@@ -25,6 +25,10 @@ writer = SummaryWriter(args.comment)
 from st3.model import DeepSpeech, ClippedReLU  # for pickle
 #model = DeepSpeech()
 
+
+freq_mask = torchaudio.transforms.FrequencyMasking(2)
+time_mask = torchaudio.transforms.TimeMasking(2)
+
 class BLSTMP(nn.Module):
     def __init__(self):
         super().__init__()
@@ -32,9 +36,9 @@ class BLSTMP(nn.Module):
         self.conv1 = nn.Conv1d(in_channels=26, out_channels=13, kernel_size=5, stride=6)
         self.lstm = nn.LSTM(input_size=13, hidden_size=512, num_layers=1, batch_first=True, bidirectional=True, proj_size=3)
 
-    def forward(self, x, augment=True):
+    def forward(self, x):
         spec = frontend(x.to(device))
-        if augment:
+        if self.training:
             spec = time_mask(freq_mask(time_mask(freq_mask(spec.permute(2,1,0))))).permute(2,1,0)
         #windows = unfold(spec.permute(2,0,1).unsqueeze(1)).permute(0,2,1)
 
@@ -191,10 +195,7 @@ def evaluate(test_data):
                 total_cer += cer(a,b)
     return dict(avg_loss=loss / len(data), avg_cer=total_cer / len(data))
 
-freq_mask = torchaudio.transforms.FrequencyMasking(2)
-time_mask = torchaudio.transforms.TimeMasking(2)
-
-for _ in range(args.epochs):
+def train_one_epoch():
     for source, targets, source_lengths, target_lengths in data:
         optimizer.zero_grad()
 
@@ -247,8 +248,13 @@ for _ in range(args.epochs):
 
     logger.info('eval {}', evaluate(test_data))
 
-torch.save({
-    'model': model.state_dict(),
-    'optimizer': optimizer.state_dict(),
-    #'lr_sched': lr_sched.state_dict(),
-}, args.output)
+
+if __name__ == '__main__':
+    for _ in range(args.epochs):
+        train_one_epoch()
+
+    torch.save({
+        'model': model.state_dict(),
+        'optimizer': optimizer.state_dict(),
+        #'lr_sched': lr_sched.state_dict(),
+    }, args.output)
